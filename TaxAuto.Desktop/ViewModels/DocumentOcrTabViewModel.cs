@@ -1,14 +1,15 @@
-﻿using TaxAuto.Desktop.Infrastructure;
-using TaxAuto.Desktop.Models;
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
-using System.Text.RegularExpressions;
-using System.Windows.Input;
+using TaxAuto.Desktop.Infrastructure;
+using TaxAuto.Desktop.Models;
+using TaxAuto.Desktop.Services;
+using System.Linq;
+using Excel = Microsoft.Office.Interop.Excel;
 
 namespace TaxAuto.Desktop.ViewModels
 {
@@ -18,9 +19,12 @@ namespace TaxAuto.Desktop.ViewModels
 
         public ObservableCollection<OcrJobItem> Jobs { get; } = new();
 
-        public ICommand SelectFilesCommand { get; }
-        public ICommand RunOcrCommand { get; }
-        public ICommand ClearCommand { get; }
+        public RelayCommand SelectFilesCommand { get; }
+        public RelayCommand RunOcrCommand { get; }
+        public RelayCommand ClearCommand { get; }
+
+        public AsyncRelayCommand ExportExcelCommand { get; }
+
 
         private bool _isRunning;
         public bool IsRunning
@@ -30,6 +34,11 @@ namespace TaxAuto.Desktop.ViewModels
             {
                 _isRunning = value;
                 OnPropertyChanged();
+
+                SelectFilesCommand?.RaiseCanExecuteChanged();
+                RunOcrCommand?.RaiseCanExecuteChanged();
+                ClearCommand?.RaiseCanExecuteChanged();
+                ExportExcelCommand?.RaiseCanExecuteChanged();
             }
         }
 
@@ -51,6 +60,60 @@ namespace TaxAuto.Desktop.ViewModels
             SelectFilesCommand = new RelayCommand(SelectFiles, () => !IsRunning);
             RunOcrCommand = new RelayCommand(async () => await RunOcrAsync(), () => !IsRunning && Jobs.Count > 0);
             ClearCommand = new RelayCommand(Clear, () => !IsRunning);
+
+            ExportExcelCommand = new AsyncRelayCommand(
+                ExportExcelAsync,
+                () => !IsRunning && Jobs.Any(x => !string.IsNullOrWhiteSpace(x.ResultJsonPath))
+            );
+        }
+
+
+        private async Task ExportExcelAsync()
+        {
+            try
+            {
+                IsRunning = true;
+
+                var dialog = new Microsoft.Win32.OpenFileDialog
+                {
+                    Title = "매입 내역을 기록할 엑셀 파일을 선택하세요",
+                    Filter = "Excel 파일 (*.xlsx)|*.xlsx|모든 파일 (*.*)|*.*"
+                };
+
+                if (dialog.ShowDialog() != true)
+                {
+                    AppendLog("엑셀 내보내기가 취소되었습니다.");
+                    return;
+                }
+
+                var loader = new OcrResultLoader();
+
+                var results = Jobs
+                    .Where(x => !string.IsNullOrWhiteSpace(x.ResultJsonPath))
+                    .Select(x => loader.LoadPurchase(x.ResultJsonPath!))
+                    .ToList();
+
+                if (results.Count == 0)
+                {
+                    AppendLog("엑셀로 내보낼 매입 OCR 결과가 없습니다.");
+                    return;
+                }
+
+                var exporter = new PurchaseExcelExporter();
+                exporter.Export(dialog.FileName, results);
+
+                AppendLog($"엑셀 내보내기 완료: {dialog.FileName}");
+
+                await Task.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"엑셀 내보내기 오류: {ex.Message}");
+            }
+            finally
+            {
+                IsRunning = false;
+            }
         }
 
         private void SelectFiles()
@@ -74,6 +137,9 @@ namespace TaxAuto.Desktop.ViewModels
             }
 
             AppendLog($"파일 {dialog.FileNames.Length}개 선택됨");
+
+            RunOcrCommand.RaiseCanExecuteChanged();
+            ClearCommand.RaiseCanExecuteChanged();
         }
 
         private async Task RunOcrAsync()
@@ -107,6 +173,9 @@ namespace TaxAuto.Desktop.ViewModels
             try
             {
                 string exePath = GetOcrExePath();
+
+                AppendLog($"OCR EXE: {exePath}");
+                AppendLog($"INPUT: {job.FilePath}");
 
                 if (!File.Exists(exePath))
                     throw new FileNotFoundException("OCR 실행 파일을 찾을 수 없습니다.", exePath);
@@ -229,6 +298,9 @@ namespace TaxAuto.Desktop.ViewModels
         {
             Jobs.Clear();
             LogText = "";
+
+            RunOcrCommand.RaiseCanExecuteChanged();
+            ClearCommand.RaiseCanExecuteChanged();
         }
 
         private void AppendLog(string message)

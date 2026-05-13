@@ -29,7 +29,13 @@
             <Button Content="Clear"
                     Width="100"
                     Height="32"
+                    Margin="0,0,8,0"
                     Command="{Binding ClearCommand}" />
+
+            <Button Content="엑셀 내보내기"
+                    Width="100"
+                    Height="32"
+                    Command="{Binding ExportExcelCommand}" /> 
         </StackPanel>
 
         <DataGrid Grid.Row="1"
