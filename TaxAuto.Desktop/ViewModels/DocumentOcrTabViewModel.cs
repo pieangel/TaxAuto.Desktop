@@ -190,11 +190,26 @@ namespace TaxAuto.Desktop.ViewModels
         {
             return _documentKind switch
             {
-                DocumentKind.Sales => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "sales_ocr", "sales_ocr.exe"),
+                DocumentKind.Sales => Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory,
+                    "tools",
+                    "sales_ocr",
+                    "sales_ocr.exe"
+                ),
 
-                DocumentKind.Purchase => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "purchase_ocr", "purchase_ocr.exe"),
+                DocumentKind.Purchase => Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory,
+                    "tools",
+                    "purchase_ocr",
+                    "purchase_ocr.exe"
+                ),
 
-                DocumentKind.WorkOrder => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "workorder_ocr", "workorder_ocr.exe"),
+                DocumentKind.WorkOrder => Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory,
+                    "tools",
+                    "workorder_ocr",
+                    "workorder_ocr.exe"
+                ),
 
                 _ => throw new NotSupportedException("지원하지 않는 문서 타입입니다.")
             };
