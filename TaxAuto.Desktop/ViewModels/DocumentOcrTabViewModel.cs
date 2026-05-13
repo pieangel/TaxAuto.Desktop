@@ -99,10 +99,27 @@ namespace TaxAuto.Desktop.ViewModels
                     return;
                 }
 
+                AppendLog($"엑셀 내보내기 시작: {dialog.FileName}");
+
                 var exporter = new PurchaseExcelExporter();
-                exporter.Export(dialog.FileName, results);
+                exporter.Export(
+                    dialog.FileName,
+                    results,
+                    AppendLog);
 
                 AppendLog($"엑셀 내보내기 완료: {dialog.FileName}");
+
+                //                 System.Windows.MessageBox.Show(
+                //                     "엑셀 내보내기가 완료되었습니다.",
+                //                     "완료",
+                //                     System.Windows.MessageBoxButton.OK,
+                //                     System.Windows.MessageBoxImage.Information);
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = dialog.FileName,
+                    UseShellExecute = true
+                });
 
                 await Task.CompletedTask;
             }

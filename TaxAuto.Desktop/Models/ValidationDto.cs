@@ -2,16 +2,23 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace TaxAuto.Desktop.Models
 {
     public class ValidationDto
     {
-        public bool TotalMatched { get; set; }
+        [JsonPropertyName("items_total_amount")]
+        public int ItemsTotalAmount { get; set; }
 
-        public int ExpectedTotal { get; set; }
+        [JsonPropertyName("document_total_raw")]
+        public string? DocumentTotalRaw { get; set; }
 
-        public int PrintedTotal { get; set; }
+        [JsonPropertyName("document_total_amount")]
+        public int? DocumentTotalAmount { get; set; }
+
+        [JsonPropertyName("total_amount_check")]
+        public bool TotalAmountCheck { get; set; }
     }
 }
