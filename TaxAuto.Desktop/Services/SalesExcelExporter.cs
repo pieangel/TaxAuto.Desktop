@@ -6,7 +6,7 @@ namespace TaxAuto.Desktop.Services
 {
     public class SalesExcelExporter
     {
-        public void Export(
+        public string Export(
             string excelPath,
             List<SalesExcelResultDto> results,
             Action<string>? log = null)
@@ -25,6 +25,8 @@ namespace TaxAuto.Desktop.Services
             workbook.SaveAs(outputPath);
 
             log?.Invoke($"신규 매출현황 저장 완료: {outputPath}");
+
+            return outputPath;
         }
 
         private void BuildTemplate(IXLWorksheet sheet)

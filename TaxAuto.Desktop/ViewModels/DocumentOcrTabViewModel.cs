@@ -152,33 +152,33 @@ namespace TaxAuto.Desktop.ViewModels
                     return;
                 }
 
-                AppendLog($"엑셀 내보내기 시작: {dialog.FileName}");
+                string? outputPath = null;
 
                 switch (_documentKind)
                 {
                     case DocumentKind.Purchase:
                         ExportPurchaseExcel(dialog.FileName);
+                        outputPath = dialog.FileName;
                         break;
 
                     case DocumentKind.Sales:
-                        ExportSalesExcel(dialog.FileName);
+                        outputPath = ExportSalesExcel(dialog.FileName);
                         break;
 
                     case DocumentKind.WorkOrder:
                         ExportWorkOrderExcel(dialog.FileName);
+                        outputPath = dialog.FileName;
                         break;
-
-                    default:
-                        throw new NotSupportedException("지원하지 않는 문서 타입입니다.");
                 }
 
-                AppendLog($"엑셀 내보내기 완료: {dialog.FileName}");
-
-                Process.Start(new ProcessStartInfo
+                if (!string.IsNullOrWhiteSpace(outputPath))
                 {
-                    FileName = dialog.FileName,
-                    UseShellExecute = true
-                });
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = outputPath,
+                        UseShellExecute = true
+                    });
+                }
 
                 await Task.CompletedTask;
             }
@@ -226,7 +226,7 @@ namespace TaxAuto.Desktop.ViewModels
                 AppendLog);
         }
 
-        private void ExportSalesExcel(string excelPath)
+        private string? ExportSalesExcel(string excelPath)
         {
             var loader = new OcrResultLoader();
 
@@ -238,12 +238,12 @@ namespace TaxAuto.Desktop.ViewModels
             if (results.Count == 0)
             {
                 AppendLog("엑셀로 내보낼 매출 OCR 결과가 없습니다.");
-                return;
+                return null;
             }
 
             var exporter = new SalesExcelExporter();
 
-            exporter.Export(
+            return exporter.Export(
                 excelPath,
                 results,
                 AppendLog);
