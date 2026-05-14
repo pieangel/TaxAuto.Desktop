@@ -31,5 +31,25 @@ namespace TaxAuto.Desktop.Services
         {
             throw new NotSupportedException("작업지시 OCR 결과 로더는 아직 구현되지 않았습니다.");
         }
+
+        public List<WorkOrderExcelResultDto> LoadWorkOrders(string jsonPath)
+        {
+            if (!File.Exists(jsonPath))
+                throw new FileNotFoundException("작업지시 OCR JSON 파일을 찾지 못했습니다.", jsonPath);
+
+            string json = File.ReadAllText(jsonPath);
+
+            var result = JsonSerializer.Deserialize<WorkOrderOcrResultDto>(
+                json,
+                new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+            if (result == null)
+                throw new InvalidOperationException("작업지시 OCR JSON 파싱에 실패했습니다.");
+
+            return result.Cards ?? new List<WorkOrderExcelResultDto>();
+        }
     }
 }

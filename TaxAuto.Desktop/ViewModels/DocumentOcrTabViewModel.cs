@@ -255,7 +255,7 @@ namespace TaxAuto.Desktop.ViewModels
 
             var results = Jobs
                 .Where(x => !string.IsNullOrWhiteSpace(x.ResultJsonPath))
-                .Select(x => loader.LoadWorkOrder(x.ResultJsonPath!))
+                .SelectMany(x => loader.LoadWorkOrders(x.ResultJsonPath!))
                 .ToList();
 
             if (results.Count == 0)
