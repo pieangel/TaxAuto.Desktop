@@ -7,113 +7,94 @@ namespace TaxAuto.Desktop.Services
     public class SalesExcelExporter
     {
         public void Export(
-    string excelPath,
-    List<SalesExcelResultDto> results,
-    Action<string>? log = null)
+            string excelPath,
+            List<SalesExcelResultDto> results,
+            Action<string>? log = null)
         {
-            try
-            {
-                log?.Invoke($"엑셀 파일 열기: {excelPath}");
-                log?.Invoke($"매출 결과 개수: {results.Count}");
+            var outputPath = Path.Combine(
+                Path.GetDirectoryName(excelPath)!,
+                Path.GetFileNameWithoutExtension(excelPath) + "_신규매출현황.xlsx"
+            );
 
-                using var workbook = new XLWorkbook(excelPath);
+            using var workbook = new XLWorkbook();
+            var sheet = workbook.Worksheets.Add("입력");
 
-                var sheet = workbook.Worksheet("입력");
+            BuildTemplate(sheet);
+            WriteResults(sheet, results, log);
 
-                int row = FindNextRow(sheet);
-                log?.Invoke($"매출 입력 시작 행: {row}");
+            workbook.SaveAs(outputPath);
 
-                foreach (var result in results)
-                {
-                    try
-                    {
-                        //sheet.Cell(row, 2).Value = NormalizeDate(result.Date);      // B: 일자
-                        sheet.Cell(row, 3).Value = result.CustomerName ?? "";       // C: 업체
-
-                        //CopyManagerFormula(sheet, row);                             // D: 담당
-
-                        sheet.Cell(row, 5).Value = result.StorageNo ?? "";          // E: 저장 번호
-                        sheet.Cell(row, 6).Value = result.TotalAmount ?? 0;          // F: 매출금액
-                        sheet.Cell(row, 7).Value = "수주";                           // G: 비고
-
-                        log?.Invoke($"매출 입력: row={row}, {result.CustomerName} / {result.TotalAmount:N0}원");
-
-                        row++;
-                    }
-                    catch (Exception ex)
-                    {
-                        log?.Invoke($"매출 행 입력 오류: row={row}, 업체={result.CustomerName}, 오류={ex}");
-                        throw;
-                    }
-                }
-
-                var outputPath = Path.Combine(
-                    Path.GetDirectoryName(excelPath)!,
-                    Path.GetFileNameWithoutExtension(excelPath) + "_매출입력완료.xlsx"
-                );
-
-                log?.Invoke($"엑셀 저장 시도: {outputPath}");
-                RemoveAllAutoFilters(workbook, log);
-
-                workbook.SaveAs(outputPath);
-
-                log?.Invoke($"엑셀 저장 완료: {outputPath}");
-            }
-            catch (Exception ex)
-            {
-                log?.Invoke($"SalesExcelExporter.Export 오류: {ex}");
-                throw;
-            }
+            log?.Invoke($"신규 매출현황 저장 완료: {outputPath}");
         }
 
-        private void RemoveAllAutoFilters(XLWorkbook workbook, Action<string>? log = null)
+        private void BuildTemplate(IXLWorksheet sheet)
         {
-            foreach (var ws in workbook.Worksheets)
-            {
-                try
-                {
-                    ws.AutoFilter.Clear();
-                    ws.RangeUsed()?.SetAutoFilter(false);
+            sheet.Style.Font.FontName = "굴림체";
+            sheet.Style.Font.FontSize = 9;
 
-                    foreach (var table in ws.Tables)
-                    {
-                        table.ShowAutoFilter = false;
-                    }
+            sheet.Cell(1, 2).Value = "일 자";
+            sheet.Cell(1, 3).Value = "업 체";
+            sheet.Cell(1, 4).Value = "담 당";
+            sheet.Cell(1, 5).Value = "저 장 번 호";
+            sheet.Cell(1, 6).Value = "매출금액";
+            sheet.Cell(1, 7).Value = "비 고";
 
-                    log?.Invoke($"AutoFilter 제거: {ws.Name}");
-                }
-                catch (Exception ex)
-                {
-                    log?.Invoke($"AutoFilter 제거 실패: {ws.Name} / {ex.Message}");
-                }
-            }
+            var header = sheet.Range(1, 2, 1, 7);
+            header.Style.Font.Bold = true;
+            header.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            header.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+
+            sheet.Column(2).Width = 10;
+            sheet.Column(3).Width = 18;
+            sheet.Column(4).Width = 10;
+            sheet.Column(5).Width = 42;
+            sheet.Column(6).Width = 15;
+            sheet.Column(7).Width = 12;
+
+            sheet.Column(6).Style.NumberFormat.Format = "#,##0";
         }
 
-        private int FindNextRow(IXLWorksheet sheet)
+        private void WriteResults(
+            IXLWorksheet sheet,
+            List<SalesExcelResultDto> results,
+            Action<string>? log)
         {
-            int row = 4;
+            int row = 2;
+            bool wroteToday = false;
 
-            while (true)
+            foreach (var result in results)
             {
-                var customer = sheet.Cell(row, 3).GetString();
+                foreach (var item in result.Items)
+                {
+                    if (!wroteToday)
+                    {
+                        sheet.Cell(row, 1).Value = DateTime.Today.ToString("M/d");
+                        wroteToday = true;
+                    }
 
-                if (string.IsNullOrWhiteSpace(customer))
-                    return row;
+                    sheet.Cell(row, 2).Value = NormalizeDate(result.Date);
+                    sheet.Cell(row, 3).Value = result.CustomerName ?? "";
+                    sheet.Cell(row, 4).Value = result.Manager ?? "";
+                    sheet.Cell(row, 5).Value = item.ItemName ?? item.ItemNameRaw ?? "";
+                    sheet.Cell(row, 6).Value = item.CalculatedAmount ?? item.Amount ?? 0;
+                    sheet.Cell(row, 7).Value = "수주";
+
+                    var range = sheet.Range(row, 1, row, 7);
+                    range.Style.Font.FontName = "굴림체";
+                    range.Style.Font.FontSize = 9;
+                    range.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+
+                    sheet.Cell(row, 6).Style.NumberFormat.Format = "#,##0";
+                    sheet.Cell(row, 6).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+
+                    row++;
+                }
 
                 row++;
+
+                log?.Invoke(
+                    $"매출 상세 입력: {result.CustomerName} / 품목 {result.Items.Count}개 / 총액 {result.TotalAmount:N0}원");
             }
-        }
-
-        private void CopyManagerFormula(IXLWorksheet sheet, int row)
-        {
-            if (row <= 4)
-                return;
-
-            var source = sheet.Cell(row - 1, 4);
-            var target = sheet.Cell(row, 4);
-
-            if (!string.IsNullOrWhiteSpace(source.FormulaA1))
-                target.FormulaA1 = source.FormulaA1;
         }
 
         private string NormalizeDate(string? raw)
@@ -124,7 +105,12 @@ namespace TaxAuto.Desktop.Services
             var digits = new string(raw.Where(char.IsDigit).ToArray());
 
             if (digits.Length >= 8)
-                return $"{digits[..4]}-{digits.Substring(4, 2)}-{digits.Substring(6, 2)}";
+            {
+                int month = int.Parse(digits.Substring(4, 2));
+                int day = int.Parse(digits.Substring(6, 2));
+
+                return $"{month}/{day}";
+            }
 
             return raw;
         }
