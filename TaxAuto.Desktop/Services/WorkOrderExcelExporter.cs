@@ -1,5 +1,7 @@
 ﻿using ClosedXML.Excel;
+using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 using TaxAuto.Desktop.Models;
 
@@ -8,6 +10,86 @@ namespace TaxAuto.Desktop.Services
     public class WorkOrderExcelExporter
     {
         private const string SheetNameFallback = "작업기록";
+
+        public async Task ExportAsync(
+            string excelPath,
+            List<string> resultJsonPaths,
+            Action<string>? log = null)
+        {
+            if (!File.Exists(excelPath))
+                throw new FileNotFoundException("엑셀 파일을 찾지 못했습니다.", excelPath);
+
+            if (resultJsonPaths == null || resultJsonPaths.Count == 0)
+            {
+                log?.Invoke("작업지시 엑셀 내보내기: OCR 결과 JSON이 없습니다.");
+                return;
+            }
+
+            string exePath = Path.Combine(
+                AppContext.BaseDirectory,
+                "tools",
+                "workorder_excel_exporter",
+                "workorder_excel_exporter.exe");
+
+            if (!File.Exists(exePath))
+                throw new FileNotFoundException("작업지시 엑셀 내보내기 EXE를 찾지 못했습니다.", exePath);
+
+            var args = new StringBuilder();
+            args.Append($"\"{excelPath}\" ");
+
+            foreach (var jsonPath in resultJsonPaths)
+            {
+                if (!File.Exists(jsonPath))
+                {
+                    log?.Invoke($"JSON 파일 없음. 제외: {jsonPath}");
+                    continue;
+                }
+
+                args.Append($"\"{jsonPath}\" ");
+            }
+
+            log?.Invoke($"Excel Export EXE: {exePath}");
+            log?.Invoke($"EXCEL: {excelPath}");
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = exePath,
+                Arguments = args.ToString(),
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8,
+            };
+
+            using var process = new Process();
+            process.StartInfo = psi;
+
+            process.OutputDataReceived += (_, e) =>
+            {
+                if (!string.IsNullOrWhiteSpace(e.Data))
+                    log?.Invoke(e.Data);
+            };
+
+            process.ErrorDataReceived += (_, e) =>
+            {
+                if (!string.IsNullOrWhiteSpace(e.Data))
+                    log?.Invoke("[ERR] " + e.Data);
+            };
+
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+
+            await process.WaitForExitAsync();
+
+            if (process.ExitCode != 0)
+                throw new Exception($"작업지시 엑셀 내보내기 실패. ExitCode={process.ExitCode}");
+
+            log?.Invoke("작업지시 엑셀 내보내기 완료");
+        }
+    
 
         public void Export(
             string excelPath,

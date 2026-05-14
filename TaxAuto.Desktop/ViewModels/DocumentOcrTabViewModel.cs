@@ -166,7 +166,7 @@ namespace TaxAuto.Desktop.ViewModels
                         break;
 
                     case DocumentKind.WorkOrder:
-                        ExportWorkOrderExcel(dialog.FileName);
+                        await ExportWorkOrderExcelAsync(dialog.FileName);
                         outputPath = dialog.FileName;
                         break;
                 }
@@ -269,6 +269,32 @@ namespace TaxAuto.Desktop.ViewModels
             exporter.Export(
                 excelPath,
                 results,
+                AppendLog);
+        }
+
+
+        private async Task ExportWorkOrderExcelAsync(string excelPath)
+        {
+            var jsonPaths = Jobs
+                .Where(x => !string.IsNullOrWhiteSpace(x.ResultJsonPath))
+                .Select(x => x.ResultJsonPath!)
+                .Where(File.Exists)
+                .Distinct()
+                .ToList();
+
+            if (jsonPaths.Count == 0)
+            {
+                AppendLog("엑셀로 내보낼 작업지시 OCR 결과 JSON이 없습니다.");
+                return;
+            }
+
+            AppendLog($"작업지시 엑셀 내보내기 JSON 개수: {jsonPaths.Count}");
+
+            var exporter = new WorkOrderExcelExporter();
+
+            await exporter.ExportAsync(
+                excelPath,
+                jsonPaths,
                 AppendLog);
         }
 
