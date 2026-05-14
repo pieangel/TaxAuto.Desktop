@@ -68,7 +68,7 @@ namespace TaxAuto.Desktop.ViewModels
         }
 
 
-        private async Task ExportExcelAsync()
+        private async Task ExportExcelAsync_old()
         {
             try
             {
@@ -132,6 +132,147 @@ namespace TaxAuto.Desktop.ViewModels
                 IsRunning = false;
             }
         }
+
+
+        private async Task ExportExcelAsync()
+        {
+            try
+            {
+                IsRunning = true;
+
+                var dialog = new OpenFileDialog
+                {
+                    Title = GetExcelDialogTitle(),
+                    Filter = "Excel 파일 (*.xlsx)|*.xlsx|모든 파일 (*.*)|*.*"
+                };
+
+                if (dialog.ShowDialog() != true)
+                {
+                    AppendLog("엑셀 내보내기가 취소되었습니다.");
+                    return;
+                }
+
+                AppendLog($"엑셀 내보내기 시작: {dialog.FileName}");
+
+                switch (_documentKind)
+                {
+                    case DocumentKind.Purchase:
+                        ExportPurchaseExcel(dialog.FileName);
+                        break;
+
+                    case DocumentKind.Sales:
+                        ExportSalesExcel(dialog.FileName);
+                        break;
+
+                    case DocumentKind.WorkOrder:
+                        ExportWorkOrderExcel(dialog.FileName);
+                        break;
+
+                    default:
+                        throw new NotSupportedException("지원하지 않는 문서 타입입니다.");
+                }
+
+                AppendLog($"엑셀 내보내기 완료: {dialog.FileName}");
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = dialog.FileName,
+                    UseShellExecute = true
+                });
+
+                await Task.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"엑셀 내보내기 오류: {ex.Message}");
+            }
+            finally
+            {
+                IsRunning = false;
+            }
+        }
+
+        private string GetExcelDialogTitle()
+        {
+            return _documentKind switch
+            {
+                DocumentKind.Purchase => "매입 내역을 기록할 엑셀 파일을 선택하세요",
+                DocumentKind.Sales => "매출 내역을 기록할 엑셀 파일을 선택하세요",
+                DocumentKind.WorkOrder => "작업지시 내역을 기록할 엑셀 파일을 선택하세요",
+                _ => "엑셀 파일을 선택하세요"
+            };
+        }
+
+        private void ExportPurchaseExcel(string excelPath)
+        {
+            var loader = new OcrResultLoader();
+
+            var results = Jobs
+                .Where(x => !string.IsNullOrWhiteSpace(x.ResultJsonPath))
+                .Select(x => loader.LoadPurchase(x.ResultJsonPath!))
+                .ToList();
+
+            if (results.Count == 0)
+            {
+                AppendLog("엑셀로 내보낼 매입 OCR 결과가 없습니다.");
+                return;
+            }
+
+            var exporter = new PurchaseExcelExporter();
+
+            exporter.Export(
+                excelPath,
+                results,
+                AppendLog);
+        }
+
+        private void ExportSalesExcel(string excelPath)
+        {
+            var loader = new OcrResultLoader();
+
+            var results = Jobs
+                .Where(x => !string.IsNullOrWhiteSpace(x.ResultJsonPath))
+                .Select(x => loader.LoadSales(x.ResultJsonPath!))
+                .ToList();
+
+            if (results.Count == 0)
+            {
+                AppendLog("엑셀로 내보낼 매출 OCR 결과가 없습니다.");
+                return;
+            }
+
+            var exporter = new SalesExcelExporter();
+
+            exporter.Export(
+                excelPath,
+                results,
+                AppendLog);
+        }
+
+        private void ExportWorkOrderExcel(string excelPath)
+        {
+            var loader = new OcrResultLoader();
+
+            var results = Jobs
+                .Where(x => !string.IsNullOrWhiteSpace(x.ResultJsonPath))
+                .Select(x => loader.LoadWorkOrder(x.ResultJsonPath!))
+                .ToList();
+
+            if (results.Count == 0)
+            {
+                AppendLog("엑셀로 내보낼 작업지시 OCR 결과가 없습니다.");
+                return;
+            }
+
+            var exporter = new WorkOrderExcelExporter();
+
+            exporter.Export(
+                excelPath,
+                results,
+                AppendLog);
+        }
+
+
 
         private void SelectFiles()
         {

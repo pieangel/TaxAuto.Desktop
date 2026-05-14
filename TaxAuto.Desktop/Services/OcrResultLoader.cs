@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using System.IO;
 using TaxAuto.Desktop.Models;
+using System.Text;
 
 namespace TaxAuto.Desktop.Services
 {
@@ -12,6 +13,23 @@ namespace TaxAuto.Desktop.Services
 
             return JsonSerializer.Deserialize<PurchaseOcrResult>(json)!
                    ?? throw new Exception("JSON deserialize 실패");
+        }
+
+        public SalesExcelResultDto LoadSales(string jsonPath)
+        {
+            var json = File.ReadAllText(jsonPath, Encoding.UTF8);
+
+            var result = JsonSerializer.Deserialize<SalesExcelResultDto>(json);
+
+            if (result == null)
+                throw new InvalidOperationException("매출 OCR 결과 JSON을 읽지 못했습니다.");
+
+            return result;
+        }
+
+        public WorkOrderExcelResultDto LoadWorkOrder(string jsonPath)
+        {
+            throw new NotSupportedException("작업지시 OCR 결과 로더는 아직 구현되지 않았습니다.");
         }
     }
 }
